@@ -1,4 +1,4 @@
-# Bài tập HDH Nhúng - Biên dịch chéo thư viện và ứng dụng
+<img width="945" height="159" alt="image" src="https://github.com/user-attachments/assets/7b33cd07-76ac-4f7b-8fc9-a26d7f55b0d8" /># Bài tập HDH Nhúng - Biên dịch chéo thư viện và ứng dụng
 ## Bài tập 01: Biên dịch ứng dụng với thư viện đã có
 ### Bật cJSON trong Buildroot
 Trong folder buildroot:
@@ -24,484 +24,444 @@ ________________________________________
 ### Viết chương trình HelloJSON
 Tạo file:
 ```
-nano HelloJSON.c
+nano package/Hello_Json/src/HelloJSON.c
 ```
 code:
 ```
 #include <stdio.h>
-#include <cjson/cJSON.h>
+#include <stdlib.h>
+#include <cjson/cJSON.h> 
 
-int main()
-{
-    char json_string[] = "{\"name\":\"BBB\",\"year\":2025}";
-
+int main() {
+    const char *json_string = "{\"name\":\"BeagleBone\", \"version\":\"Black\", \"id\":123}";
     cJSON *json = cJSON_Parse(json_string);
+    
+    if (json == NULL) {
+        printf("Loi parse JSON!\n");
+        return 1;
+    }
 
-    cJSON *name = cJSON_GetObjectItem(json, "name");
-    cJSON *year = cJSON_GetObjectItem(json, "year");
+    cJSON *name = cJSON_GetObjectItemCaseSensitive(json, "name");
+    cJSON *version = cJSON_GetObjectItemCaseSensitive(json, "version");
+    cJSON *id = cJSON_GetObjectItemCaseSensitive(json, "id");
 
-    printf("Name: %s\n", name->valuestring);
-    printf("Year: %d\n", year->valueint);
+    printf("--- Thong tin JSON tu Buildroot Package ---\n");
+    if (cJSON_IsString(name)) printf("Device: %s\n", name->valuestring);
+    if (cJSON_IsString(version)) printf("Model: %s\n", version->valuestring);
+    if (cJSON_IsNumber(id)) printf("ID: %d\n", id->valueint);
 
     cJSON_Delete(json);
-
     return 0;
 }
 ```
 
-<img width="605" height="243" alt="Picture2" src="https://github.com/user-attachments/assets/4b1f886d-a093-4ad2-ac46-20b4ab33d63e" />
+<img width="945" height="434" alt="image" src="https://github.com/user-attachments/assets/e765d74f-aed4-47a6-84e8-aea567a2e5a3" />
+
 
 ________________________________________
-### Cross compile
+### Viết HelloJSON.mk
 Dùng toolchain của buildroot
-ví dụ:
+Mở:
 ```
-output/host/bin/arm-linux-gcc
+nano package/Hello_Json/HelloJSON.mk
 ```
-compile:
+Viết chương trình:
 ```
-output/host/bin/arm-linux-gcc HelloJSON.c -o HelloJSON -lcjson
+HELLO_JSON_VERSION = 1.0
+HELLO_JSON_SITE = $(HELLO_JSON_PKGDIR)/src
+HELLO_JSON_SITE_METHOD = local
+
+HELLO_JSON_DEPENDENCIES = cjson
+
+define HELLO_JSON_BUILD_CMDS
+	$(TARGET_CC) $(TARGET_CFLAGS) $(@D)/HelloJSON.c -o $(@D)/Hello_Json $(TARGET_LDFLAGS) -lcjson
+endef
+
+define HELLO_JSON_INSTALL_TARGET_CMDS
+	$(INSTALL) -D -m 0755 $(@D)/Hello_Json $(TARGET_DIR)/usr/bin/Hello_Json
+endef
+
+$(eval $(generic-package))
+
 ```
-<img width="605" height="31" alt="Picture3" src="https://github.com/user-attachments/assets/e7c60b38-57c2-44cd-b141-9e09be9a331a" />
+
+File này nói cho Buildroot biết:
+-	compile HelloJSON.c
+-	link thư viện cjson
+-	copy binary vào /usr/bin.
+
 
 
 _______________________________________
 
-### Mount thẻ SD trên Ubuntu
+### Viết config.in
 Cắm SD card vào máy tính.
-Kiểm tra thiết bị:
+Mở:
 ```
-lsblk
+nano package/Hello_Json/Config.in
 ```
-Tạo thư mục mount:
+Viết chương trình:
 ```
-sudo mkdir /mnt/sd
-```
-Mount phân vùng rootfs:
-```
-sudo mount /dev/sdb2 /mnt/sd
-```
-________________________________________
-### Copy chương trình vào thẻ SD
-Copy file vừa compile vào rootfs của thẻ SD:
-```
-cp HelloJSON /mnt/sd/
-```
-Kiểm tra file:
-```
-ls /mnt/sd
-```
-Nếu thấy:
-```
-HelloJSON
-```
-thì đã copy thành công.
-________________________________________
-### Unmount thẻ SD
-Sau khi copy xong cần tháo mount:
-```
-sudo umount /mnt/sd
-```
-Sau đó rút thẻ SD khỏi máy tính.
+config BR2_PACKAGE_HELLO_JSON
+	bool "Hello_Json"
+	select BR2_PACKAGE_CJSON
+	help
+	  Chuong trinh parse JSON don gian cho bai tap BBB.
 
-<img width="400" height="202" alt="Picture4" src="https://github.com/user-attachments/assets/0129266c-4665-483a-9568-3ef0bfae15ee" />
+```
+Ý nghĩa:
+-	tạo option Hello_Json trong menuconfig
+-	tự bật thư viện cJSON.
 
+_______________________________________
+### Đăng ký package vào Buildroot
+Mở file chính:
+```
+nano package/Config.in
+```
+Kéo xuống cuối file, thêm:
+```
+source "package/Hello_Json/Config.in"
+```
+Lưu lại.
 ________________________________________
-### Boot BeagleBone Black từ thẻ SD
-Thực hiện các bước sau:
-1.	Cắm SD card vào BBB
-2.	Nhấn giữ nút BOOT (S2)
-3.	Cắm nguồn cho BBB
-4.	Giữ nút khoảng 3–5 giây rồi thả ra
-BBB sẽ boot hệ điều hành Buildroot từ thẻ SD.
-________________________________________
-### Đăng nhập vào BBB qua UART
-Mở terminal:
-```
-screen /dev/ttyUSB0 115200
-```
-Sau khi hệ thống khởi động xong sẽ hiện:
-```
-buildroot login:
-```
-Đăng nhập:
-```
-root
-```
-________________________________________
-### Chạy chương trình
-Kiểm tra file:
-```
-ls
-```
-Nếu thấy:
-```
-HelloJSON
-```
-thì chạy chương trình:
-```
-chmod +x HelloJSON
-./HelloJSON
-```
-________________________________________
-### Kết quả
-Chương trình sẽ hiển thị:
-```
-Name: BBB
-Year: 2025
-```
-<img width="605" height="171" alt="Picture5" src="https://github.com/user-attachments/assets/c43f04fa-0dee-46ae-af33-ee72dbdd3b7a" />
+### Build lại image và chạy trên BBB
 
+<img width="945" height="64" alt="image" src="https://github.com/user-attachments/assets/09ed2935-0faa-464a-888e-c9fe6fc261eb" />
 
-Điều này chứng tỏ chương trình đã được cross compile thành công và chạy trên BeagleBone Black.
+<img width="945" height="220" alt="image" src="https://github.com/user-attachments/assets/51b01941-9ddb-43e1-bdd0-f2f8037045b6" />
+
 
 ## Bài tập 02: Tự tạo thư viện cá nhân
-### Tạo file thư viện
-Trong Ubuntu vào Buildroot:
+Vào thư mục package của repo
 ```
 cd ~/buildroot
 ```
-Tạo file source:
+
+### Tạo cấu trúc thư viện ` mylib `
+Gõ lệnh:
 ```
 nano mylib.c
 ```
-Code:
+Lúc này ta sẽ có cấu trúc:
 ```
 #include <stdio.h>
 
-void hello()
-{
-    printf("Hello from my library!\n");
-}
+buildroot
+└── package
+    └── mylib
+        └── src
+
+```
+- Tạo file header ` mylib.h`
+
+```
+nano mylib/src/mylib.h
+#ifndef MYLIB_H
+#define MYLIB_H
+
+int add(int a, int b);
+
+#endif
+
 ```
 
-<img width="605" height="167" alt="Picture1" src="https://github.com/user-attachments/assets/02389f82-ee4d-4bd0-8882-e424378b0453" />
-
-Tạo file header:
+- Tạo file ` mylib.c`
 ```
-nano mylib.h
-```
-Code:
-```
-void hello();
-```
-
-<img width="605" height="127" alt="Picture3" src="https://github.com/user-attachments/assets/3c5a675a-3858-4ebb-a524-065f64fe73bf" />
-
-### ross compile object file
-Dùng gcc của Buildroot:
-```
-output/host/bin/arm-linux-gcc -c mylib.c -o mylib.o
-```
-Kiểm tra:
-```
-ls
-```
-phải thấy:
-```
-mylib.c
-mylib.h
-mylib.o
-```
-
-<img width="605" height="265" alt="Picture4" src="https://github.com/user-attachments/assets/f6c39205-8b6b-4ca7-b8f5-64ef4aa38eb2" />
-
-### Tạo static library (.a)
-Dùng ar:
-```
-output/host/bin/arm-linux-ar rcs libmylib.a mylib.o
-```
-Kiểm tra:
-```
-ls
-```
-phải thấy:
-```
-libmylib.a
-```
-
-
-<img width="605" height="116" alt="Picture5" src="https://github.com/user-attachments/assets/b39aacb1-74b5-42b1-abaa-698ace7a14c0" />
-
-
-### Tạo shared library (.so)
-
-Compile lại với -fPIC:
-```
-output/host/bin/arm-linux-gcc -fPIC -c mylib.c
-```
-Sau đó:
-```
-output/host/bin/arm-linux-gcc -shared -o libmylib.so mylib.o
-```
-Kiểm tra:
-```
-libmylib.so
-```
-
-<img width="605" height="136" alt="Picture6" src="https://github.com/user-attachments/assets/325b6465-6a8e-4490-b72e-4776bd6aadfb" />
-
-ĐƯA THƯ VIỆN ĐÃ BIÊN DỊCH THÀNH CÔNG VÀO SYSROOT
-
-### Viết chương trình sử dụng thư viện
-Tạo file:
-```
-nano main.c
-```
-Code:
-```
+nano mylib/src/mylib.c
 #include "mylib.h"
 
-int main()
+int add(int a, int b)
 {
-    hello();
-    return 0;
+    return a + b;
 }
 
 ```
-
-<img width="605" height="143" alt="Picture7" src="https://github.com/user-attachments/assets/9c21d5e1-c8d0-4811-8244-9e921b57a568" />
-
-### Compile chương trình với static library
+- Tạo ` Config.in`
 ```
-output/host/bin/arm-linux-gcc main.c -L. -lmylib -o app_static
-```
-Kiểm tra:
-```
-file app_static
-```
-kết quả:```  ELF 32-bit ARM ```
-
-### Compile chương trình với shared library
+nano mylib/Config.in
+config BR2_PACKAGE_MYLIB
+    bool "mylib"
+    help
+      Thu vien tu tao thuc hien phep cong.
 
 ```
-output/host/bin/arm-linux-gcc main.c -L. -lmylib -o app_shared
-```
 
-<img width="605" height="115" alt="Picture8" src="https://github.com/user-attachments/assets/00394ae9-7c17-413f-869a-d47ca947a943" />
+- Tạo ` mylib.mk`
+```
+nano mylib/mylib.mk
+MYLIB_VERSION = 1.0
+MYLIB_SITE = $(MYLIB_PKGDIR)/src
+MYLIB_SITE_METHOD = local
+MYLIB_INSTALL_STAGING = YES
 
-###  Mount SD card (giống phần 1)
-Cắm SD vào Ubuntu rồi chạy:
-```
-lsblk
-```
-ví dụ thấy:
-```
-sdb
-sdb1
-sdb2
-```
-Mount rootfs:
-```
-sudo mount /dev/sdb2 /mnt/sd
-```
+define MYLIB_BUILD_CMDS
 
-### Copy chương trình và thư viện
-Copy:
-```
-sudo cp app_static /mnt/sd/
-sudo cp app_shared /mnt/sd/
-sudo cp libmylib.so /mnt/sd/usr/lib/
-```
-- Lý do:
-shared library phải nằm trong /usr/lib thì BBB mới tìm thấy.
+	# Build static library
+	$(TARGET_CC) $(TARGET_CFLAGS) -c $(@D)/mylib.c -o $(@D)/mylib.o
+	$(TARGET_AR) rcs $(@D)/libmylib.a $(@D)/mylib.o
 
-### Unmount SD
+	# Build shared library
+	$(TARGET_CC) $(TARGET_CFLAGS) -fPIC -shared $(@D)/mylib.c -o $(@D)/libmylib.so
 
-```
-sudo umount /mnt/sd
-```
-
-<img width="605" height="75" alt="Picture9" src="https://github.com/user-attachments/assets/a01cd185-f583-4cf4-9435-4d6bbb327f93" />
-
-### Boot BBB Chạy chương trình
-
-```
-sudo screen /dev/ttyUSB0 115200
-```
-login:
-```
-root
-```
-Static:
-```
-/app_static
-```
-Shared:
-```
-/app_shared
-```
-<img width="605" height="184" alt="Picture10" src="https://github.com/user-attachments/assets/4bbd7aa4-c0b2-4b49-9e53-cbf838bc1a4d" />
-
-## Bài tập 03: Tích hợp ứng dụng và thư viện và Buildroot
-### Tạo source code cho chương trình
-#### Tạo thư mục source:
-```
-mkdir myapp
-cd myapp
-```
-
-#### Tạo file chương trình
-```
-nano main.c
-```
-dán:
-```
-#include <stdio.h>
-#include <cjson/cJSON.h>
-#include "mylib.h"
-
-int main()
-{
-    hello();
-
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "board", "BBB");
-
-    printf("%s\n", cJSON_Print(root));
-
-    return 0;
-}
-```
-
-<img width="605" height="185" alt="Picture11" src="https://github.com/user-attachments/assets/f0a9362e-4b5a-4ebd-b2d1-b3fe7abcc55f" />
-
-lưu:
-```
-Ctrl+O
-Enter
-Ctrl+X
-```
-
-#### Quay lại buildroot
-```
-cd ~/buildroot
-```
-- Tạo package cho myapp
-```
-mkdir -p package/myapp
-```
-- Tạo Config.in
-```
-nano package/myapp/Config.in
-```
-dán:
-```
-config BR2_PACKAGE_MYAPP
-    bool "myapp"
-    select BR2_PACKAGE_CJSON
-    select BR2_PACKAGE_MYLIB
-```
-lưu. 
-
-
-<img width="605" height="111" alt="Picture12" src="https://github.com/user-attachments/assets/9fd5637c-99fa-44c9-a129-f58f6e939b98" />
-
-
-#### Tạo file myapp.mk
-```
-nano package/myapp/myapp.mk
-```
-dán:
-```
-MYAPP_VERSION = 1.0
-MYAPP_SITE = $(TOPDIR)/myapp
-MYAPP_SITE_METHOD = local
-
-MYAPP_DEPENDENCIES = cjson mylib
-
-define MYAPP_BUILD_CMDS
-	$(TARGET_CC) $(@D)/main.c -o $(@D)/myapp -lcjson -lmylib
 endef
 
-define MYAPP_INSTALL_TARGET_CMDS
-	$(INSTALL) -D -m 0755 $(@D)/myapp $(TARGET_DIR)/usr/bin/myapp
+define MYLIB_INSTALL_STAGING_CMDS
+
+	$(INSTALL) -D -m 0644 $(@D)/mylib.h $(STAGING_DIR)/usr/include/mylib.h
+	$(INSTALL) -D -m 0755 $(@D)/libmylib.a $(STAGING_DIR)/usr/lib/libmylib.a
+	$(INSTALL) -D -m 0755 $(@D)/libmylib.so $(STAGING_DIR)/usr/lib/libmylib.so
+
+endef
+
+define MYLIB_INSTALL_TARGET_CMDS
+
+	$(INSTALL) -D -m 0755 $(@D)/libmylib.so $(TARGET_DIR)/usr/lib/libmylib.so
+
+endef
+
+$(eval $(generic-package))
+
+```
+
+### Đăng ký package vào Buildroot
+Mở file:
+```
+nano ~/buildroot/package/Config.in
+```
+Thêm dòng:
+```
+source "package/mylib/Config.in"
+```
+
+### Viết chương trình test `mylib_test`
+Tạo thư mục:
+```
+cd ~/buildroot/package
+mkdir -p mylib_test/src
+
+```
+- Tạo file ` main.c`
+```
+nano mylib_test/src/main.c
+#include <stdio.h>
+#include <mylib.h>
+
+int main()
+{
+    printf("--- Bai tap 02 ---\n");
+    printf("15 + 25 = %d\n", add(15,25));
+    return 0;
+}
+
+```
+
+- Tạo ` mylib_test.mk`
+```
+nano mylib_test/mylib_test.mk
+MYLIB_TEST_VERSION = 1.0
+MYLIB_TEST_SITE = $(MYLIB_TEST_PKGDIR)/src
+MYLIB_TEST_SITE_METHOD = local
+MYLIB_TEST_DEPENDENCIES = mylib
+
+define MYLIB_TEST_BUILD_CMDS
+
+	# Dynamic link
+	$(TARGET_CC) $(TARGET_CFLAGS) $(@D)/main.c -o $(@D)/app_dynamic -lmylib
+
+	# Static link
+	$(TARGET_CC) $(TARGET_CFLAGS) $(@D)/main.c -o $(@D)/app_static -L$(STAGING_DIR)/usr/lib -lmylib -static
+
+endef
+
+define MYLIB_TEST_INSTALL_TARGET_CMDS
+
+	$(INSTALL) -D -m 0755 $(@D)/app_dynamic $(TARGET_DIR)/usr/bin/app_dynamic
+	$(INSTALL) -D -m 0755 $(@D)/app_static $(TARGET_DIR)/usr/bin/app_static
+
 endef
 
 $(eval $(generic-package))
 ```
-lưu. 
+- Tạo ` Config.in`
+```
+nano mylib_test/Config.in
+config BR2_PACKAGE_MYLIB_TEST
+    bool "mylib_test"
+    select BR2_PACKAGE_MYLIB
+    help
+      Chuong trinh test thu vien.
+```
 
-<img width="605" height="164" alt="Picture13" src="https://github.com/user-attachments/assets/f32f0076-9b96-4b27-89dd-f8be2e764c78" />
+- Đăng ký package và Bật package
+Mở lại:
+```
+nano ~/buildroot/package/Config.in
+```
+
+Thêm:
+```
+source "package/mylib_test/Config.in"
+```
+Bật package chọn
+```
+[*] mylib
+[*] mylib_test
+```
+
+<img width="945" height="647" alt="image" src="https://github.com/user-attachments/assets/cce7c041-1342-43d0-b21b-174b538e7964" />
 
 
-TẠO SOURCE CHO MYLIB
-1️⃣ quay ra home
-```
-cd ~
-```
-2️⃣ tạo thư viện
-```
-mkdir mylib
-cd mylib
-```
-3️⃣ tạo file header
-```
-nano mylib.h
-#ifndef MYLIB_H
-#define MYLIB_H
-
-void hello();
-
-#endif
-```
-4️⃣ tạo file source
-```
-nano mylib.c
-#include <stdio.h>
-#include "mylib.h"
-
-void hello()
-{
-    printf("Hello from mylib\n");
-}
-```
-#### Thêm package vào Buildroot
-Mở:
-```
-nano package/Config.in
-```
-thêm 2 dòng này ở cuối file
-```
-source "package/mylib/Config.in"
-source "package/myapp/Config.in"
-```
-lưu.
-
-#### Bật package trong menuconfig
-```
-make menuconfig
-```
-vào:
-```
-Target packages
-```
-tìm:
-```
-myapp
-```
-tick:
-```
-[*] myapp
-```
-Save → Exit.
-
-#### Build lại
+### Build
 ```
 make
 ```
-đợi build xong.
+Sau khi build xong Binary nằm ở ` output/target/usr/bin`
+Sẽ có:
 
-#### Sau khi build xong
-flash lại image ra SD:
 ```
-sudo dd if=output/images/sdcard.img of=/dev/sdb bs=4M status=progress
+app_dynamic
+app_static
+
+```
+
+<img width="878" height="325" alt="image" src="https://github.com/user-attachments/assets/1c6cb94e-589d-496f-8cc7-99e5f9de81d0" />
+
+
+### So sánh kích thước chương trình
+Dùng lệnh:
+```
+ls -lh app_*
+```
+
+<img width="930" height="120" alt="image" src="https://github.com/user-attachments/assets/f7f7db98-dd31-47c4-83fa-0eb15a4cfc9f" />
+
+-	Dynamic link → dùng thư viện ngoài (libmylib.so)
+-	Static link → nhúng toàn bộ thư viện vào file
+
+###  Kiểm tra dependencies bằng ` readelf`
+Với chương trình dynamic
+```
+readelf -d app_dynamic
+```
+Sẽ thấy:
+
+
+<img width="945" height="159" alt="image" src="https://github.com/user-attachments/assets/a8d96050-bd9f-41d9-840c-0b017e3261aa" />
+
+Với chương trình static
+
+```
+readelf -d app_static
+```
+Kết quả thường:
+
+
+<img width="945" height="79" alt="image" src="https://github.com/user-attachments/assets/006a3273-889d-43bb-872f-73eda982df69" />
+
+
+## Bài tập 03: Tích hợp ứng dụng và thư viện và Buildroot
+
+### Cấu trúc package
+```
+package/APP_ADD_JSON
+│
+├── Config.in
+├── APP_ADD_JSON.mk
+└── src
+    └── main.c
+```
+
+### Code chương trình
+```
+#include <stdio.h>
+#include <cjson/cJSON.h>
+#include <mylib.h>
+
+int main()
+{
+    int a = 20;
+    int b = 30;
+
+    int sum = add(a, b);
+
+    cJSON *root = cJSON_CreateObject();
+
+    cJSON_AddStringToObject(root, "Title", "Bai Tap 03 - Tong Hop");
+    cJSON_AddNumberToObject(root, "Input_A", a);
+    cJSON_AddNumberToObject(root, "Input_B", b);
+    cJSON_AddNumberToObject(root, "Result_Sum", sum);
+
+    char *json_print = cJSON_Print(root);
+
+    printf("%s\n", json_print);
+
+    cJSON_Delete(root);
+
+    return 0;
+}
+
+```
+#### File ` APP_ADD_JSON.mk`
+```
+APP_ADD_JSON_VERSION = 1.0
+APP_ADD_JSON_SITE = $(APP_ADD_JSON_PKGDIR)/src
+APP_ADD_JSON_SITE_METHOD = local
+
+# Ràng buộc phải có 2 thư viện này thì mới build app
+APP_ADD_JSON_DEPENDENCIES = cjson mylib
+
+define APP_ADD_JSON_BUILD_CMDS
+	# Sử dụng biến $(@D) để trỏ vào thư mục build tạm thời
+	$(TARGET_CC) $(TARGET_CFLAGS) $(@D)/main.c -o $(@D)/APP_ADD_JSON \
+		$(TARGET_LDFLAGS) -lcjson -lmylib
+endef
+
+define APP_ADD_JSON_INSTALL_TARGET_CMDS
+	# Ép file thực thi vào thư mục /usr/bin trên SD Card
+	$(INSTALL) -D -m 0755 $(@D)/APP_ADD_JSON $(TARGET_DIR)/usr/bin/APP_ADD_JSON
+endef
+
+$(eval $(generic-package))
+```
+
+### File ` Config.in`
+```
+config BR2_PACKAGE_APP_ADD_JSON
+    bool "APP_ADD_JSON"
+    select BR2_PACKAGE_CJSON
+    select BR2_PACKAGE_MYLIB
+    help
+      Chuong trinh tong hop su dung cJSON (Bai 1) va mylib (Bai 2).
+
+```
+### Build ứng dụng
+
++	Chạy make menuconfig và bật APP_ADD_JSON.
++	Build bằng make.
+
+### Kết quả
+Binary ` output/target/usr/bin/APP_ADD_JSON` được tạo.
+Tạo SD card và boot
+```
+cd ~/Documents/buildroot/
+sudo dd if=output/images/sdcard.img of=/dev/sda bs=4M status=progress conv=fsync
 sync
 ```
+### Chạy chương trình trên thiết bị
 
-#### Boot BBB
-sau khi boot
+```
+$ APP_ADD_JSON
+{
+ "Title": "Bai Tap 03 - Tong Hop",
+ "Input_A": 20,
+ "Input_B": 30,
+ "Result_Sum": 50
+}
 
-<img width="605" height="123" alt="Picture14" src="https://github.com/user-attachments/assets/ca715997-1b05-4ca2-8016-0f272d51fb82" />
+```
+
+ <img width="945" height="548" alt="image" src="https://github.com/user-attachments/assets/40cca8e3-479b-433f-95de-5c0ae94da6c2" />
+
 
 
